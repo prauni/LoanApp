@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Loan;
 use App\Models\LoanRepayment;
-use Illuminate\Support\Facades\Gate;
 
 class LoanController extends Controller
 {
@@ -16,7 +15,7 @@ class LoanController extends Controller
     public function list(){
 
         $list = Loan::with(['user','repayment']);
-        if(!Auth::user()->is_admin){
+        if(!empty(Auth::user()) && Auth::user()->is_admin == 0){
             $list = $list->where('user_id', Auth::user()->id);
         }
         $list = $list->get()->toArray();
@@ -33,7 +32,7 @@ class LoanController extends Controller
             return response()->json($validator->errors(), 400);
         }
 
-        $insData['user_id'] = Auth::user()->id;
+        $insData['user_id'] = isset(Auth::user()->id)?Auth::user()->id:0;
         $insData['amount']  = $request->amount;
         $insData['tender']  = $request->tender;
         $res = Loan::create($insData);
@@ -77,7 +76,7 @@ class LoanController extends Controller
         $loan_id = $request->loan_id;
         $amount  = $request->amount;
         $whereCond['id'] = $loan_id;
-        if(!Auth::user()->is_admin){
+        if(!empty(Auth::user()) && Auth::user()->is_admin == 0){
             $whereCond['user_id'] = Auth::user()->id;
         }
         $loanDetails = Loan::where($whereCond)->get();
@@ -106,7 +105,7 @@ class LoanController extends Controller
         $repaymentAmount = LoanRepayment::selectRaw("SUM(amount) as total_paid_amount")->where('loan_id', $loan_id)->groupBy('loan_id')->get()->toArray();
         $totalPaidAmount = isset($repaymentAmount[0]['total_paid_amount'])?$repaymentAmount[0]['total_paid_amount']:0;
         $remainingAmount = $loanDetails->amount - $totalPaidAmount;
-        
+
         if($remainingAmount < $request->amount){
             $error_msg = 'Loan\'s max repayment amount is '.$remainingAmount;
             return response()->json(['error'=>true, 'message'=>$error_msg], 400);
